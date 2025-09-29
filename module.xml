@@ -7,7 +7,7 @@
       <Description>IrisconfigDashboard</Description>
       <Keywords>Terminal, COS</Keywords>
       <Packaging>module</Packaging>
-      <Resource Name="IrisconfigDashboard.PKG"/>
+      <Resource Name="IRISConfig.PKG"/>
       <LifecycleClass>%IPM.Lifecycle.Module</LifecycleClass>
     </Module>
   </Document>
