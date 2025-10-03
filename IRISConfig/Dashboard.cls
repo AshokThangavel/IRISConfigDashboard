@@ -2,7 +2,7 @@ Class IRISConfig.Dashboard Extends %CSP.Page
 {
 Parameter Title As STRING [ Final ] = "IRIS Configuration Dashboard";
 
-Parameter Sections As COSEXPRESSION = "$LB(""System"",""Configuration"",""Namespaces"",""Databases"",""RemoteDataBase"",""Journals"",""Memory"",""License"",""Task"",""Introperability"",""Security"",""LDAP"",""X509"",""SSLConfig"",""WebApps"",""Audit"",""Monitoring"",""SQLAndObject"",""Sharding"",""Mirror"",""WebGateway"",""ECP"",""DocDB"",""WQM"",""Python"")";
+Parameter Sections As COSEXPRESSION = "$LB(""System"",""Configuration"",""Namespaces"",""Databases"",""RemoteDataBase"",""Journals"",""Memory"",""License"",""Task"",""Introperability"",""Security"",""LDAP"",""X509"",""SSLConfig"",""WebApps"",""Audit"",""Monitoring"",""SQLAndObject"",""Sharding"",""Mirror"",""WebGateway"",""ECP"",""DocDB"",""FHIR"",""ExternalGateway"",""WQM"",""Python"",""ZPM"")";
 
 Property Sections [ MultiDimensional ];
 
@@ -32,7 +32,7 @@ Method CollectInfo()
 {
 	New $NAMESPACE
 	Set $NAMESPACE="%SYS"
-	Set ptr=0
+	Set ptr = 0
 	While $ListNext(..#Sections, ptr, method) {
 		Do $Method(, $ZCVT(method,"W"))
 	}
@@ -47,7 +47,7 @@ Method GenerateHTML()
 	Write " <div class=""header-actions"">"
     Set systemType = ##class(%SYSTEM.Version).SystemMode()
     If systemType'="" {
-	    Write "<p class=""system-badge system-"_$ZCVT(systemType,"L")_""" title="""_$ZVersion_""">"_$ZCVT(systemType,"W")_" System</p>"
+	    Write "<p class=""system-badge system-"_$ZCVT(systemType,"L")_""" title="""_..GetVersion()_""">"_$ZCVT(systemType,"W")_" System</p>"
     }
 	Write "<button class=""toggle-btn"" id=""toggleAllBtn"" onclick=""toggleAll()"">"
 	Write "<i class=""fas fa-compress-alt""></i> Collapse All"
@@ -63,14 +63,14 @@ Method GenerateHTML()
 	Write "</div>"
 	Write "</header>"
 	#; header ends
-
-	/// Container starts
+	#; Container starts
 	Write "<div class=""container"">"
-	/// menu button
+	#; menu button
 	Write "<div class=""button-row"">"
 	Set ptr=0
 	While $ListNext(..#Sections, ptr, section) {
 		Set val1 = $ZCVT(section,"l")
+		Continue:..HealthRelevantMenu(val1)
 		Write "<button class=""section-btn active"" onclick=""toggleSection('"_val1_"')"">"
 		Write "<i class=""fas "_..Icons(val1)_"""></i>"
 		Write section
@@ -81,7 +81,7 @@ Method GenerateHTML()
 		Do ..PrintContainer(val)
 	}
 	Write "</div>"
-	/// ScrollTop arrow
+	#; ScrollTop arrow
 	Write "<div>"
 	Write "<button class=""fab1"" onclick=""scrollToTop()"">"
 	Write "<i class=""fas fa-arrow-up""></i>"
@@ -91,14 +91,14 @@ Method GenerateHTML()
 	Quit
 }
 
-Method Namespaces()
+Method Namespaces() [ Internal ]
 {
  	Set tResult = ##Class(Config.Namespaces).ListFunc()
  	Do ..CreateDataFromSQL(tResult,.table)
  	Set ..Sections($$$CurrentMethod,"Namespaces")=table
 }
 
-Method Configuration()
+Method Configuration() [ Internal ]
 {
 	Merge Properties = ..SystemProps("Compatibility")
 	Set ..Sections($$$CurrentMethod,"Compatibility") = ..DrawHTMLTable(.Properties)
@@ -110,9 +110,9 @@ Method Configuration()
 	Set ..Sections($$$CurrentMethod,"Startup") = ..DrawHTMLTable(.Properties)
 }
 
-Method Memory()
+Method Memory() [ Internal ]
 {
-	Set fields=$LB("bbsiz","globals8kb","globals16kb","globals32kb","globals64kb","routines","globals4kb","gmheap","jrnbufs",)
+	Set fields=$LB("bbsiz","globals8kb","globals16kb","globals32kb","globals64kb","routines","globals4kb","gmheap","jrnbufs")
 	Set table = "<table>"
 	Set table=table_"<thead><th>option</th><th>value</th><th>Recommanded</th></thead>"
 	Set table = table_"<tbody>"
@@ -126,13 +126,13 @@ Method Memory()
 	Set ..Sections($$$CurrentMethod,"Startup Memory")=table
 }
 
-Method Webapps()
+Method Webapps() [ Internal ]
 {
 	Do ..CreateDataFromSQL(##class(Security.Applications).ListFunc(),.table)
 	Set ..Sections($$$CurrentMethod)=table
 }
 
-Method System()
+Method System() [ Internal ]
 {
 	Set section = $NA(..Sections($$$CurrentMethod))
 	Set tSC = ##class(%CSP.UI.Portal.API).GetSystemInfo(.pObject)
@@ -141,39 +141,45 @@ Method System()
 	Set @section@(2,"Version")=pObject.CacheVerStr_" ["_pObject.ComponentVersionList_"]"
 	Set @section@(3,"OS")=##class(%SYSTEM.Version).GetOS()
 	Set @section@(4,"Installed Dir")=$System.Util.InstallDirectory()
-	Set @section@(13,"64 bit") =..BoolToStr(##class(%SYSTEM.Version).Is64Bits())
-	Set @section@(18,"Endian")=$Select(##class(%SYSTEM.Version).IsBigEndian():"Big Endian",1:"Little Endian")
-	Set @section@(17,"Unicode")=..BoolToStr(##class(%SYSTEM.Version).IsUnicode())
 	Set @section@(5,"IP Address")=pObject.IPAddress
 	Set @section@(6,"Web port")=pObject.WebPort
 	Set @section@(7,"Licensed to")=pObject.LicenseTo
 	Set @section@(8,"Superserver Port ")=pObject.SuperserverPort
 	Set @section@(9,"System Mode")=##class(%SYSTEM.Version).SystemMode()
-
 	Set cpuObj = ##class(%SYSTEM.CPU).%New()
-
 	Set @section@(10,"Architecture")=cpuObj.Arch
 	Set @section@(11,"Model")=cpuObj.Model
 	Set @section@(12,"Vendor")=cpuObj.Vendor
+	Set @section@(13,"64 bit") =..BoolToStr(##class(%SYSTEM.Version).Is64Bits())
 	Set @section@(14,"Cores")=cpuObj.nCores
 	Set @section@(15,"Cores Per Chip")=cpuObj.nCoresPerChip
 	Set @section@(16,"Threads")=cpuObj.nThreads
+	Set @section@(17,"Multi Thread Enabled")=..BoolToStr(cpuObj.MTEnabled)
+	Set @section@(18,"Multi Thread Supported")=..BoolToStr(cpuObj.MTSupported)
+	Set @section@(19,"Unicode")=..BoolToStr(##class(%SYSTEM.Version).IsUnicode())
+	Set @section@(20,"Endian")=$Select(##class(%SYSTEM.Version).IsBigEndian():"Big Endian",1:"Little Endian")
 }
 
-Method Journals()
+Method Externalgateway() [ Internal ]
+{
+	Do ..CreateDataFromSQL(##class(Config.Gateways).ListShortFunc(),.table)
+	Set ..Sections($$$CurrentMethod)=table
+}
+
+Method Journals() [ Internal ]
 {
 	Merge ..Sections($$$CurrentMethod) = ..SystemProps("Journal")
 	Do ..CreateDataFromSQL(##Class(%SYS.Journal.File).ByTimeReverseOrderFunc(),.table)
 	Set ..Sections($$$CurrentMethod,"JournalFiles") = table
 }
 
-Method Mirror()
+Method Mirror() [ Internal ]
 {
 	Do ..CreateDataFromSQL(##class(SYS.Mirror).MirroredDatabaseListFunc(),.table)
 	Set ..Sections($$$CurrentMethod,"Mirrored DB List") = table
 }
 
-Method Ecp()
+Method Ecp() [ Internal ]
 {
 	Merge Properties = ..SystemProps("ECP")
 	Set ..Sections($$$CurrentMethod,"Basic") = ..DrawHTMLTable(.Properties)
@@ -185,7 +191,7 @@ Method Ecp()
 	Set ..Sections($$$CurrentMethod,"ECP Application Server") = table
 }
 
-Method Webgateway()
+Method Webgateway() [ Internal ]
 {
 	Set Reg=$SYSTEM.CSP.GetGatewayRegistry()
 	Set activeMgrs=Reg.GetGatewayMgrs("a")
@@ -193,7 +199,6 @@ Method Webgateway()
 	Set table="<table>"
 	Set table = table_"<thead><th>Server</th><th>Status</th></thead>"
 	Set table = table_"<tbody>"
-
 	Set webgatewayTab = ""
 	For i=1:1:activeMgrs.Count() {
 		#dim MgrImplObj As %CSP.Mgr.GatewayMgrImpl = activeMgrs.GetAt(i)
@@ -231,7 +236,7 @@ Method Webgateway()
 	Set ..Sections($$$CurrentMethod,"Inactive Gateway Information") = webgatewayTab
 }
 
-Method Wqm()
+Method Wqm() [ Internal ]
 {
 	If $$$ClassExist("Config.WorkQueues"){
 		Set result = ##class(Config.WorkQueues).ListFilterFunc()
@@ -243,7 +248,7 @@ Method Wqm()
 	Set ..Sections($$$CurrentMethod,"WQM List")=table
 }
 
-Method Python()
+Method Python() [ Internal ]
 {
 	If '$$$ClassExist("%SYS.Python") Q ""
 #if $$$CacheVersionMajor>=2024
@@ -254,7 +259,7 @@ Method Python()
 #endif
 }
 
-Method License()
+Method License() [ Internal ]
 {
 	Try {Do ##class(%CSP.UI.Portal.License.Utils).GetLicenseInfo(.License)}Catch ex {}
 	Set ..Sections($$$CurrentMethod,"License Key")=..DrawHTMLTable(.License)
@@ -262,34 +267,35 @@ Method License()
 	Set ..Sections($$$CurrentMethod,"License Servers")=table
 }
 
-Method Security()
+Method Security() [ Internal ]
 {
 	Do ##Class(Security.System).Get("SYSTEM",.Properties)
 	Set ..Sections($$$CurrentMethod,"Authentication/Web Session Options ")=..DrawHTMLTable(.Properties)
 	Set ..Sections($$$CurrentMethod,"System-wide Security Parameters")=..DrawHTMLTable(.Properties)
 }
 
-Method Sslconfig()
+Method Sslconfig() [ Internal ]
 {
 	Do ..CreateDataFromSQL(##Class(Security.SSLConfigs).ListFunc(),.table)
 	Set ..Sections($$$CurrentMethod)=table
 }
 
-Method Ldap()
+Method Ldap() [ Internal ]
 {
 	Do ..CreateDataFromSQL(##Class(Security.LDAPConfigs).ListFunc(),.table)
 	Set ..Sections($$$CurrentMethod)=table
 }
 
-Method X509()
+Method X509() [ Internal ]
 {
 	Do ..CreateDataFromSQL(##class(%SYS.X509Credentials).ListDetailsFunc(),.table)
  	Set ..Sections($$$CurrentMethod)=table
 }
 
-Method Audit()
+Method Audit() [ Internal ]
 {
-	Set ..Sections($$$CurrentMethod)="Audit database: "_$Select($LG(^SYS("Security","SystemD","SYSTEM"),2):"Enabled",1:"Disabled")
+	Set IsAuditEnabled =$Select( $LG(^SYS("Security","SystemD","SYSTEM"),2):"Enabled",1:"Disabled")
+	Set ..Sections($$$CurrentMethod)="Audit database: "_"<b class="""_$ZCVT(IsAuditEnabled,"l")_""">"_IsAuditEnabled_"</b>"
 	Do ..CreateDataFromSQL(##class(Security.Events).ListAllSystemFunc(),.table)
 	Set ..Sections($$$CurrentMethod,"System Audit Events")=table
 	Do ..CreateDataFromSQL(##class(Security.Events).ListAllUserFunc(),.table)
@@ -336,43 +342,24 @@ ClassMethod ChangeFormats(ChangeFormats, Data)
 	Return Data
 }
 
-ClassMethod DrawHTMLTable(ByRef Details, ChangeFormats = "")
-{
-	Set table = "<table>"
-	Set table=table_"<thead><th>Option</th><th>Value</th></thead>"
-	Set table = table_"<tbody>"
-	Set key=""
-	For {
-		Set key = $O(Details(key),1,data) Q:key=""
-		Set table = table_"<tr><td>"_..FullName(key)_"</td>"
-		If ChangeFormats'="" {
-			Set table = table_"<td>"_..ChangeFormats(ChangeFormats,data)_"</td></tr>"
-		}
-		Else{
-			Set table= table_"<td>"_data_"</td></tr>"
-		}
-	}
-	Set table = table_"</tbody>"
-	Set table = table_"</table>"
-	Return table
-}
-
 Method PrintContainer(Container As %String = "")
 {
 	Return:Container=""
 	Set Container = $ZCVT(Container,"l")
-	Write "<div id="""_Container_""" class=""section-content"">"
-	Write "<div class=""section-header"">"
-	Write "<div class=""section-title"">"
+	Write "<div id="""_Container_""" class=""section-content"">",!
+	Write "<div class=""section-header"">",!
+	Write "<div class=""section-title"">",!
 	Write "<div class=""section-icon""><i class=""fas fa-info-circle""></i></div>"
 	Write $ZCVT(Container,"W")_" Information"
-	Write "</div>"
+	Write "</div>",!
 	Write "<button class=""minimize-btn"" onclick=""minimizeSection('"_Container_"', event)"">"
 	Write " <i class=""fas fa-minus""></i>"
-    Write "</button>"
-    Write "</div>"
-    Write "<div class=""table-container"">"
-    Write "<h3>"_..Sections(Container)_"<h3>"
+    Write "</button>",!
+    Write "</div>",!
+    Write "<div class=""table-container"">",!
+    If ..Sections(Container)'=""{
+	    Write "<h3>"_..Sections(Container)_"<h3>",!
+    }
     Write "<table>"
     Write "<thead>"
     Write "<tr>"
@@ -406,26 +393,26 @@ Method PrintContainer(Container As %String = "")
 	    }
 
     }
-    Write "</tbody>"
-    Write "</table>"
-    Write "</div>"
-    Write "</div>"
+    Write "</tbody>",!
+    Write "</table>",!
+    Write "</div>",!
+    Write "</div>",!
 }
 
-Method Task()
+Method Task() [ Internal ]
 {
 	Set ..Sections($$$CurrentMethod)="Most tasks are system-related. Please exercise caution before suspending. If suspension is necessary, consult with the system administrator first"
 	Do ..CreateDataFromSQL(##Class(%SYS.Task).OnDemandTasksFilterFunc(),.table)
 	Set ..Sections($$$CurrentMethod,"TaskList")=table
 }
 
-Method Databases()
+Method Databases() [ Internal ]
 {
 	Do ..CreateDataFromSQL(##Class(Config.Databases).LocalDatabaseListFilterFunc(),.databases)
 	Set ..Sections($$$CurrentMethod,"Databases")=databases
 }
 
-Method Sqlandobject()
+Method Sqlandobject() [ Internal ]
 {
 	Set tSC = ##class(%CSP.UI.Portal.SQL.Utils).GetConfigSQLProperties(.Properties)
 	If $$$ISOK(tSC) {
@@ -436,13 +423,13 @@ Method Sqlandobject()
 	Set ..Sections($$$CurrentMethod,"Objects")=..DrawHTMLTable(.Properties,"checkbox")
 }
 
-Method Remotedatabase()
+Method Remotedatabase() [ Internal ]
 {
 	Do ..CreateDataFromSQL(##class(Config.Databases).ListFilterFunc(,,2),.databases)
 	Set ..Sections($$$CurrentMethod,"RemoteDatabases")=databases
 }
 
-Method Docdb()
+Method Docdb() [ Internal ]
 {
 	Set tResult = ##Class(Security.DocDBs).ListFunc()
 	Set files="<table>"
@@ -458,7 +445,7 @@ Method Docdb()
 	Set ..Sections($$$CurrentMethod,"DB List")=files
 }
 
-Method Introperability()
+Method Introperability() [ Internal ]
 {
 	Do ..GetInteropStatus()
 }
@@ -480,9 +467,14 @@ Method GetInteropStatus()
 
 Method Fhir()
 {
+	If $system.Version.GetISCComponents()="" Quit
+	New $NAMESPACE
+	Set $NAMESPACE="HSLIB"	
+	Do ..CreateDataFromSQL(##class(HS.Util.Installer.ConfigItem).ConfigurationFunc(),.table)
+	Set ..Sections($$$CurrentMethod,"Foundation Namespace")=table
 }
 
-Method Monitoring()
+Method Monitoring() [ Internal ]
 {
 	Set ..Sections($$$CurrentMethod,"MONMGR")=..MONMGR()
 	//Set ..Sections($$$CurrentMethod,"HealthMonitor")=..HelathMonitor()
@@ -492,7 +484,7 @@ Method Monitoring()
 	Set ..Sections($$$CurrentMethod,"SNMP")=..SNMP()
 }
 
-Method MONMGR()
+Method MONMGR() [ Internal ]
 {
 	If '$D(^["%SYS"]ISCMonitor("Monitor")) Q "<h4>No MONMGR configured</h4>"
 	Set m=""
@@ -510,7 +502,7 @@ Method MONMGR()
 	q table
 }
 
-Method Trace()
+Method Trace() [ Internal ]
 {
 	If '$$$ClassExist("%SYS.Trace") Quit ""
 	Set table = "<table>"
@@ -525,7 +517,7 @@ Method Trace()
 	quit table
 }
 
-Method LOGDMN()
+Method LOGDMN() [ Internal ]
 {
 	Set CONFIG=$NA(^CONFIG("Logging"))
 	Set table = "<table>"
@@ -542,7 +534,7 @@ Method LOGDMN()
 	Return table
 }
 
-Method SystemPerformance()
+Method SystemPerformance() [ Internal ]
 {
 	Set table = "<table>"
 	Set table=table_"<thead><th>option</th><th>value</th></thead>"
@@ -571,18 +563,112 @@ Method SNMP()
 	Q "<h4>In progress</h4>"
 }
 
-Method Process()
+Method Process() [ Internal ]
 {
  	Do ..CreateDataFromSQL(##CLASS(SYS.Process).CONTROLPANELFunc(),.table)
  	Set ..Sections($$$CurrentMethod,"Current Process")=table
 }
 
-Method Sharding()
+Method Sharding() [ Internal ]
 {
 	Do ..CreateDataFromSQL(##class(%SQL.Manager.Catalog).ListShardsFunc(),.table)
 	Set ..Sections($$$CurrentMethod,"Node-Level")=table
 	Do ..CreateDataFromSQL(##class(%SQL.Manager.Catalog).ShardedTablesFunc(),.table)
 	Set ..Sections($$$CurrentMethod,"Namespace-Level")=""
+}
+
+Method Zpm() [ Internal ]
+{
+	Set ..Sections($$$CurrentMethod)="<h3>InterSystems Package Manager</h3>"
+	Set namespace=""
+	For {
+		Set namespace = $Order(..SystemProps("Namespaces",namespace)) Q:namespace=""
+		New $namespace
+		Set $NAMESPACE=namespace
+		Continue:'$$$ClassExist("%IPM.Main")
+		Set IsZPMInstalled = $system.CLS.IsMthd("%IPM.Main", "Shell")
+		If IsZPMInstalled {
+			Kill Prop
+			Try {
+				Do ##class(%IPM.Main).GetVersion("zpm",.reg)
+				Set Prop("version")=##class(%IPM.Main).GetVersionModule()
+				Set Prop("registry")=$Select(reg'="":reg,1:"No registry configured")
+				Set namespace(namespace)=..BoolToStr(IsZPMInstalled)_"<br>"_
+			 						  ..DrawHTMLTable(.Prop)_"<br>"_
+			 						  ..CollectInstalledModules(namespace)
+			}Catch ex{}
+		 }
+		 Else {
+			 Set namespace(namespace)=..BoolToStr(IsZPMInstalled)
+		 }
+	}
+	Set ..Sections($$$CurrentMethod,"ZPM Enabled")=..DrawHTMLTable(.namespace)
+}
+
+Method CollectInstalledModules(pNamespace As %String = {$NAMESPACE}) As %String
+{
+	Do ##class(%IPM.Main).GetListModules(pNamespace,"zpm",.list)
+	Kill list("width")
+	If $Data(list)>1 {
+		Kill list("width")
+		Return ..DrawDynamicHTMLTable(.list,$LB("Module","Version"))
+	}
+	Return ""
+}
+
+Method HealthRelevantMenu(menu)
+{
+	If $system.Version.GetISCComponents()=""&&(menu="fhir") Quit 1
+	Q 0
+}
+
+ClassMethod GetVersion() [ CodeMode = expression ]
+{
+$Select($$$ClassExist("%ZHSLIB.HealthShareMgr"):##CLASS(%ZHSLIB.HealthShareMgr).VersionInfo(1),1:$ZV)
+}
+
+ClassMethod DrawHTMLTable(ByRef Details, ChangeFormats = "")
+{
+	Set table = "<table>"
+	Set table=table_"<thead><th>Option</th><th>Value</th></thead>"
+	Set table = table_"<tbody>"
+	Set key=""
+	For {
+		Set key = $O(Details(key),1,data) Q:key=""
+		Set table = table_"<tr><td>"_..FullName(key)_"</td>"
+		If ChangeFormats'="" {
+			Set table = table_"<td>"_..ChangeFormats(ChangeFormats,data)_"</td></tr>"
+		}
+		Else{
+			Set table= table_"<td>"_data_"</td></tr>"
+		}
+	}
+	Set table = table_"</tbody>"
+	Set table = table_"</table>"
+	Return table
+}
+
+ClassMethod DrawDynamicHTMLTable(ByRef Properties, headers As %List) As %String
+{
+	Set table = "<table>"
+	Set table=table_"<thead>"
+	Set ptr=0
+	While $ListNext(headers,ptr,header) {
+		Set table=table_"<th>"_header_"</th>"
+	}
+	Set table=table_"<tbody>"
+	Set prop=""
+	For {
+		Set prop = $Order(Properties(prop),1,data) Q:prop=""
+		Set table = table_"<tr>"
+		For i=1:1:$LL(headers) {
+			Set table=table_"<td>"_$LG(data,i)_"</td>"
+		}
+		Set table = table_"</tr>"
+	}
+	Set table=table_"</tbody>"
+	Set table=table_"</table>"
+	Return table
 }
 
 ClassMethod OnPageCSPROOT() As %Boolean
@@ -595,31 +681,31 @@ ClassMethod OnPageHTML() As %Boolean
 	Write "<html>"
 	Write !
 	Do ..OnPageHEAD()
-	Write !,!
 	Do ..OnPageBODY()
 	Write !,"</html>"
-	Return 1
+	Return $$$OK
 }
 
 ClassMethod OnPageHEAD() As %Boolean
 {
 	Set %zUndefinedSystem = $$$GetUndefined
 	$$$DisableUndefined
-	Write "<head>"
+	Write "<head>",!
+	Write "<link rel=""shortcut icon"" href=""portal/ISC_IRIS_icon.ico"">"
 	Write !,"<title>"_..#Title_"</title>",!
-	Write " <link rel=""stylesheet"" href=""https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"">"
-	Write "<style>"
+	Write " <link rel=""stylesheet"" href=""https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"">",!
+	Write "<style>",!
 	Do ..LoadCSS()
-	Write "</style>"
-	Write !,"</head>"
+	Write "</style>",!
+	Write "</head>",!
 	Do ..HyperEventHead(0,0)
-	Return 1
+	Return $$$OK
 }
 
 ClassMethod OnPageBODY() As %Boolean
 {
 	Do ..RenderHTML()
-	Return 1
+	Return $$$OK
 }
 
 ClassMethod LoadCSS()
@@ -636,10 +722,9 @@ XData Style
 {
 <data>
 	<![CDATA[*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Courier New','Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background-color:#f5f7fa;color:#333;line-height:1.6}.container{max-width:1400px;margin:0 auto;padding:20px}header{background:linear-gradient(135deg,#2A3987 0%,#764ba2 100%);color:white;/*padding:30px 0*/;box-shadow:0 2px 10px rgba(0,0,0,0.1);margin-bottom:30px}.header-content{display:flex;justify-content:space-between;align-items:center;max-width:1400px;margin:0 auto;padding:0 20px}h1{font-size:2rem;font-weight:600}.header-actions{display:flex;gap:15px;align-items:center}.toggle-btn{background:rgba(255,255,255,0.2);border:2px solid white;color:white;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:1rem;font-weight:500;transition:all 0.3s ease;display:flex;align-items:center;gap:8px}.toggle-btn:hover{background:white;color:#2A3987;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.15)}.export-btn{background:rgba(255,255,255,0.2);border:2px solid white;color:white;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:1rem;font-weight:500;transition:all 0.3s ease;display:flex;align-items:center;gap:8px}.export-btn:hover{background:white;color:#2A3987;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.15)}.button-row{display:flex;flex-wrap:wrap;gap:15px;margin-bottom:30px;justify-content:center}.section-btn{background:white;border:2px solid #e2e8f0;color:#4a5568;padding:15px 25px;border-radius:10px;cursor:pointer;font-size:1rem;font-weight:500;transition:all 0.3s ease;box-shadow:0 2px 5px rgba(0,0,0,0.05);display:flex;align-items:center;gap:8px}.section-btn:hover{border-color:#2A3987;color:#2A3987;transform:translateY(-2px);box-shadow:0 4px 12px rgba(102,126,234,0.2)}.section-btn.active{background:#2A3987;color:white;border-color:#2A3987}.section-content{background:white;border-radius:12px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden;transition:all 0.3s ease;display:block}.section-content.collapsed{display:none}.section-header{background:#f7fafc;padding:20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center}.section-title{font-size:1.5rem;font-weight:600;color:#2d3748;display:flex;align-items:center;gap:10px}.section-icon{width:40px;height:40px;background:#2A3987;color:white;border-radius:8px;display:flex;align-items:center;justify-content:center}.minimize-btn{background:#e2e8f0;border:none;color:#4a5568;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all 0.3s ease}.minimize-btn:hover{background:#cbd5e0;color:#2d3748}.table-container{overflow-x:auto;padding:20px}table{width:100%;border-collapse:collapse;font-size:0.95rem}th,td{padding:12px 15px;text-align:left;border-bottom:1px solid #e2e8f0}th{background:#f7fafc;font-weight:600;color:#4a5568;position:sticky;top:0;z-index:10}tr:hover{background:#f7fafc}.status-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:500}.status-active{background:#c6f6d5;color:#276749}.status-inactive{background:#fed7d7;color:#9b2c2c}.status-warning{background:#fefcbf;color:#744210}.value-cell{font-family:'Courier New',monospace;background:#f7fafc;padding:4px 8px;border-radius:4px;display:inline-block}@media (max-width:768px){.header-content{flex-direction:column;gap:20px}.header-actions{flex-direction:column;width:100%;gap:10px}.toggle-btn,.export-btn{width:100%;justify-content:center}.button-row{justify-content:flex-start}.section-btn{font-size:0.9rem;padding:12px 20px}h1{font-size:1.5rem}} .system-badge{display:inline-block;padding:6px 12px;border-radius:4px;font-weight:bold;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;box-shadow:0 2px 4px rgba(0,0,0,0.1);transition:all 0.2s ease;cursor:default}.system-LIVE{background-color:#28a745;color:white;border:1px solid #1e7e34}.system-DEVELOPMENT{background-color:#007bff;color:white;border:1px solid #0056b3}.system-TEST{background-color:#ffc107;color:#212529;border:1px solid #d39e00}.system-FAILOVER{background-color:#dc3545;color:white;border:1px solid #c82333}.system-badge:hover{transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,0.15)}
-
-	body.dark-mode {background-color: #1a202c; color: #e2e8f0;} body.dark-mode header {background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%) !important;} body.dark-mode .container, body.dark-mode .section-content, body.dark-mode .section-header, body.dark-mode .section-btn, body.dark-mode table, body.dark-mode th, body.dark-mode td {background-color: #2d3748; color: #e2e8f0; border-color: #4a5568;} body.dark-mode .section-btn.active {background-color: #2A3987; color: white; border-color: #2A3987;} body.dark-mode .header-content {background: transparent !important;} body.dark-mode .section-title {font-size: 1.5rem; font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 10px;} body.dark-mode .container {background-color: transparent;} body.dark-mode .minimize-btn {background-color: #4a5568; color: #e2e8f0;} body.dark-mode .minimize-btn:hover {background-color: #718096;} .toggle-btn, .export-btn, .theme-toggle {background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: var(--transition); display: flex; align-items: center; gap: 8px;}
-
-	.fab1 {position: fixed;bottom: 20px;right: 20px;width: 56px;height: 56px;border-radius: 50%;} .fab1:hover {transform: scale(1.1);box-shadow: 0 6px 30px rgba(0, 217, 255, 0.6);} body.dark-mode .fab1 {background-color: #2d3748;color: #e2e8f0;border-color: #4a5568;}
+body.dark-mode {background-color: #1a202c; color: #e2e8f0;} body.dark-mode header {background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%) !important;} body.dark-mode .container, body.dark-mode .section-content, body.dark-mode .section-header, body.dark-mode .section-btn, body.dark-mode table, body.dark-mode th, body.dark-mode td {background-color: #2d3748; color: #e2e8f0; border-color: #4a5568;} body.dark-mode .section-btn.active {background-color: #2A3987; color: white; border-color: #2A3987;} body.dark-mode .header-content {background: transparent !important;} body.dark-mode .section-title {font-size: 1.5rem; font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 10px;} body.dark-mode .container {background-color: transparent;} body.dark-mode .minimize-btn {background-color: #4a5568; color: #e2e8f0;} body.dark-mode .minimize-btn:hover {background-color: #718096;} .toggle-btn, .export-btn, .theme-toggle {background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: var(--transition); display: flex; align-items: center; gap: 8px;}
+.fab1 {position: fixed;bottom: 20px;right: 20px;width: 56px;height: 56px;border-radius: 50%;} .fab1:hover {transform: scale(1.1);box-shadow: 0 6px 30px rgba(0, 217, 255, 0.6);} body.dark-mode .fab1 {background-color: #2d3748;color: #e2e8f0;border-color: #4a5568;}
+.success,.enabled { color:#18a99e;} .fail,.disabled { color:red; opacity: 0.5; or opacity: 0.3;}
 ]]>
 	</data>
 }
@@ -884,6 +969,7 @@ $Case(Icon,
 "system":"fa-info-circle",
 "configuration":"fa-cog",
 "namespaces":"fa-database",
+"fhir":"fa-regular fa-fire",
 "databases":"fa-hdd",
 "remotedatabase":"fa-network-wired",
 "journals":"fa-book",
@@ -909,6 +995,8 @@ $Case(Icon,
 "sslconfig":"fa-lock",
 "sharding":"fa-layer-group",
 "sqlandobject":"fa-solid fa-gears",
+"externalgateway":"fa-regular fa-link",
+"zpm":"fa-regular fa-cubes",
 :"")
 }
 
@@ -984,6 +1072,7 @@ ClassMethod Menu()
 	Set menu("WQM")=$LB()
 	Set menu("Webgateway")=$LB()
 	Set menu("X509")=$LB()
+	Set menu("ZPM")=$LB()
 }
 
 Method %INCLUDE()
@@ -1009,6 +1098,10 @@ Method InitilizeSystemProps()
 	Merge ..SystemProps("ECP") = Properties
 	Set tSC = ##Class(Config.Journal).Get(.Properties)
 	Merge ..SystemProps("Journal") = Properties
+	Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Nsp FROM %SYS.Namespace_List()")
+	While rs.%Next() {
+		Set ..SystemProps("Namespaces",rs.Nsp)=""
+	}
 }
 
 ClassMethod OnPostHTTP()
