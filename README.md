@@ -6,6 +6,10 @@
 
 It is particularly useful for system administrators and developers to quickly inspect various configuration areas and export the results to an HTML format for sharing or reporting purposes.
 
+**Note**: This IRIS Configuration Dashboard is read-only.<br>
+**Purpose**: To provide a centralized view of all configurations.<br>
+**Reason**: This is critical information and should only be modified by authorized users.
+
 ---
 
 ## Features
